@@ -4,13 +4,12 @@
 #define cimg_use_jpeg 1
 #include "CImg.h"
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include <cuda_runtime.h>
 
-struct TracerState;
-
-void init_tracer_state(TracerState** state, uint32_t width, uint32_t height);
-void destroy_tracer_state(TracerState* state);
-void trace_scene(TracerState* state, float* framebuffer, uint32_t width, uint32_t height, cudaTextureObject_t, uint32_t frame);
+#include "tracer.h"
 
 bool load_texture_to_cuda(const char* filename, cudaTextureObject_t& tex_object)
 {
@@ -98,7 +97,13 @@ int main(int arg, char** argv)
 	{
 		memset(framebuffer, 0, fb_width * fb_height * 3 * sizeof(float));
 
-		trace_scene(state, framebuffer, fb_width, fb_height, background_texture, frame++);
+		Camera cam;
+
+		float3 eye = make_float3(20 * sinf(frame / 180.f * M_PI), 1.0f, 20 * cosf(frame / 180.f * M_PI));
+
+		setup_camera(cam, eye, float3{0, 0, 0}, float3 {0, 1, 0}, 75.0f, float(fb_width) / fb_height);
+
+		trace_scene(state, cam, framebuffer, fb_width, fb_height, background_texture);
 
 		CImg<float> cimg_fb(framebuffer, 3, fb_width, fb_height, 1, true);
 		cimg_fb.permute_axes("yzcx");
@@ -108,6 +113,8 @@ int main(int arg, char** argv)
 		display.set_title(std::to_string(frame).c_str());
 		display.render(cimg_fb);
 		display.paint();
+
+		frame++;
 	}
 
 	destroy_tracer_state(state);
